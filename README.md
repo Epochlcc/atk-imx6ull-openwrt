@@ -14,7 +14,7 @@ sudo apt install -y build-essential ccache ecj fastjar file g++ gawk gettext \
 ```
 
 ```bash
-git clone <本仓库地址> atk-imx6ull-openwrt
+https://github.com/Epochlcc/atk-imx6ull-openwrt.git
 cd atk-imx6ull-openwrt
 
 ./scripts/bootstrap.sh   # 拉取上游（submodule，约 1 GB，视网络 5-30 分钟）
