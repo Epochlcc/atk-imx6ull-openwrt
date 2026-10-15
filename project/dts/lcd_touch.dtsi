@@ -1,0 +1,318 @@
+/*
+ * ============================================================================
+ *  文件名称 : lcd_touch.dtsi
+ *  功能描述 : 为 ATK i.MX6ULL 板（OpenWrt / Linux 5.15.148）补齐
+ *             「7 寸 1024x600 RGB 屏 + GT9xx 电容触摸」所需的全部节点。
+ *             加入它之后 /dev/fb0 与 /dev/input/eventX 才会出现，
+ *             从而能跑 Qt5 前台。
+ *
+ *  引用依据 : 正点原子 alpha 板可用配置
+ *             D:\project\imx-forge\driver\device_tree\alpha-board\linux\imx6ull-aes.dtsi
+ *             以及教程 document/tutorial/kernel/07_dts_writing.md（GPIO1_IO09 争夺战）
+ *             与 10_touch_gt9xx.md
+ *
+ *  使用方法 : 把本文件放到 project/dts/ 下，并在
+ *             project/dts/imx6ull-atk-mmc.dts 的**最后一个 '};' 之后**
+ *             追加一行：   #include "lcd_touch.dtsi"
+ *             —— 必须放文件末尾：&label 覆盖要在被引用的根节点解析完之后。
+ *
+ *  修改日期 : 2026-10-15
+ * ============================================================================
+ */
+
+/* ==========================================================================
+ * 一、根节点下新增：背光 / 面板 / 触摸供电 / SD 供电修正
+ * ========================================================================== */
+/ {
+	/* ---- 背光：PWM1_OUT（PAD_GPIO1_IO08）驱动，周期 5ms（200Hz） ----
+	 * 注意 PAD_GPIO1_IO08 在本板原本没有任何复用配置，需要靠下面的
+	 * pinctrl_pwm1 把它切到 PWM1_OUT 才有波形。 */
+	backlight_display: backlight-display {
+		compatible = "pwm-backlight";
+		pwms = <&pwm1 0 5000000 0>;
+		brightness-levels = <0 4 8 16 32 64 128 255>;
+		default-brightness-level = <6>;
+		status = "okay";
+	};
+
+	/* ---- 面板：用 panel-dpi，时序直接写在 DT 里，不依赖驱动内置面板表 ----
+	 * 关键：panel 的 endpoint 必须与 &lcdif 的 endpoint 互为 remote-endpoint，
+	 *       否则 DRM 拿不到 connector，/dev/fb0 永远不会出现。 */
+	panel: panel-dpi {
+		compatible = "panel-dpi";
+		backlight = <&backlight_display>;
+
+		width-mm = <154>;
+		height-mm = <86>;
+
+		panel-timing {
+			clock-frequency = <51200000>;	/* 51.2MHz → 1024x600 约 60Hz */
+			hactive = <1024>;
+			vactive = <600>;
+			hfront-porch = <160>;
+			hback-porch = <140>;
+			hsync-len = <20>;
+			vback-porch = <20>;
+			vfront-porch = <12>;
+			vsync-len = <3>;
+			hsync-active = <0>;
+			vsync-active = <0>;
+			de-active = <1>;
+			pixelclk-active = <0>;
+		};
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&lcdif_out>;
+			};
+		};
+	};
+
+	/* ---- 触摸供电 ----
+	 * goodix 驱动用 devm_regulator_get(dev, "AVDD28") / (dev, "VDDIO") 取电，
+	 * 对应的 DT 属性名是 avdd28-supply / vddio-supply。缺了会让 probe 直接失败
+	 * （-EPROBE_DEFER），板子上看不到任何 input 设备。
+	 * 这两路电在本板是常供的，用无 GPIO 的 fixed regulator 描述即可。 */
+	reg_vddio: regulator-vddio {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDIO";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
+	reg_avdd28: regulator-avdd28 {
+		compatible = "regulator-fixed";
+		regulator-name = "AVDD28";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		regulator-always-on;
+	};
+
+};
+
+/* ==========================================================================
+ * 一之二、★ SD 卡供电描述修正（重要，别跳过）
+ *
+ * 原板级 DTS（project/dts/imx6ull-atk-mmc.dts:49-57）抄自 EVK 参考板：
+ *     reg_sd1_vmmc: regulator@1 {
+ *         compatible = "regulator-fixed";
+ *         regulator-name = "VSD_3V3";
+ *         regulator-min-microvolt = <3300000>;
+ *         regulator-max-microvolt = <3300000>;
+ *         gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;   ← 争用 GPIO1_IO09
+ *         off-on-delay = <20000>;
+ *         enable-active-high;
+ *     };
+ * 也就是说 SD 卡电源使能被绑在 GPIO1_IO09 上。但本板这根脚实际接的是
+ * GT9xx 的触摸中断 INT。两者都会 request_gpio，谁先 probe 谁赢，后到的报：
+ *     Goodix-TS 1-005d: error -EBUSY: Failed to get irq GPIO
+ * 或反过来 SD 初始化失败，取决于 probe 顺序。
+ *
+ * 解法（与正点原子 alpha 板一致）：承认与参考板的接线差异，把这个调节器
+ * 退化成「固定常开 3.3V」——删掉三个和 GPIO 有关的属性，只留电压描述。
+ * 用 /delete-property/ 而不是重新定义节点：重新定义会撞 label
+ * （duplicate_label: /regulator@1 与 /regulators/regulator@1）。
+ *
+ * 覆盖后本板 SD 卡照常可用（U-Boot 已供电且不关断）。
+ * ========================================================================== */
+&reg_sd1_vmmc {
+	/delete-property/ gpio;
+	/delete-property/ enable-active-high;
+	/delete-property/ off-on-delay;
+	regulator-always-on;
+};
+
+/* ==========================================================================
+ * 二、LCDIF：使能 + 指定父时钟 + 端口对接
+ * ========================================================================== */
+&lcdif {
+	/* lcdif_pre_sel 的 6 个候选父时钟里第 3 个是 pll5_video_div
+	 * （见 drivers/clk/imx/clk-imx6ul.c:45 的 lcdif_pre_sels[]）。
+	 * 不显式指定父时钟就凑不出 51.2MHz 像素时钟，画面会花或干脆不出图。 */
+	assigned-clocks = <&clks IMX6UL_CLK_LCDIF_PRE_SEL>;
+	assigned-clock-parents = <&clks IMX6UL_CLK_PLL5_VIDEO_DIV>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_lcdif_dat &pinctrl_lcdif_ctrl>;
+	status = "okay";
+
+	port {
+		lcdif_out: endpoint {
+			remote-endpoint = <&panel_in>;
+		};
+	};
+};
+
+/* ==========================================================================
+ * 三、背光 PWM 控制器
+ *
+ * ★ 这里原本还写了 `&pwm1 { pinctrl-0 = <&pinctrl_pwm1>; status = "okay"; }`，
+ *   属于冗余：板级 DTS `imx6ull-atk-mmc.dts:393-397` 已经把它使能并绑好
+ *   引脚组了。重复写一遍只有坏处（改错一个字段就会静默覆盖板级配置），
+ *   已删除。本文件只负责板级 DTS 里没有的东西。
+ * ========================================================================== */
+
+/* ==========================================================================
+ * 四、I2C2 上的 GT9xx 电容触摸
+ *
+ * 属性名必须与 goodix.c 对齐（5.15 源码）：
+ *   #define GOODIX_GPIO_INT_NAME "irq"    → 属性 irq-gpios
+ *   #define GOODIX_GPIO_RST_NAME "reset"  → 属性 reset-gpios
+ *   devm_regulator_get(dev, "VDDIO"/"AVDD28") → vddio-supply / avdd28-supply
+ * 支持的 compatible 含 "goodix,gt9147"（goodix.c of_match 表内）。
+ *
+ * ★ I2C 地址口径（这一条写错触摸就永远不 probe，goodix 驱动不做地址扫描）：
+ *   本板实测这颗 GT9147 挂在 **0x5d**（7 位地址）。
+ *
+ *   2026-10-15 在板子上用自编的 i2c_probe 扫 /dev/i2c-1 得到的确凿结果：
+ *       0x5d: 有应答 (读到 0x00)
+ *       0x14: No such device or address (-6 / -ENXIO)
+ *   而此前写成 0x14 的依据是 imx-forge 的 `document/tutorial/kernel/10_touch_gt9xx.md`，
+ *   那份文档描述的是另一块板子，**不能套到本板**。教训：地址这种硬事实只能上板实测，
+ *   不能靠抄别人的文档 —— 当时也因此白烧了一版固件（dmesg 里
+ *   `Goodix-TS 1-0014: i2c test failed attempt 1/2: -6` → `I2C communication failure: -6`）。
+ *
+ *   goodix.c 里 0x14 是**特殊值**，它决定复位序列中 INT 脚的电平
+ *   （`goodix_reset_no_int_sync()`：`goodix_irq_direction_output(ts, ts->client->addr == 0x14)`，
+ *    内核注释原文用 <- 写的是：HIGH 对应 0x28/0x29，LOW 对应 0xBA/0xBB。注意
+ *    DTS 的块注释不能嵌套，所以这里不要写 C 风格的注释符号）：
+ *       reg = <0x14> → INT 拉高，选 7 位地址 0x28/0x29
+ *       reg = <0x5d> → INT 拉低，选 8 位 0xBA/0xBB（= 7 位 0x5d）
+ *   ⇒ 两者必须配套。本板芯片落在 0x5d，所以 reg 写 0x5d，驱动复位时把 INT 拉低，
+ *     与芯片实际状态一致；写成 0x14 会把 INT 拉高、且去探测一个不存在的地址。
+ *
+ *   资料里另一个写法 0xba 是含读写位的 8 位形式；QEMU 的 gt911 模型硬编码 0x5d 只是巧合。
+ * ========================================================================== */
+&i2c2 {
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2>;
+	status = "okay";
+
+	gt9147: gt9147@5d {
+		compatible = "goodix,gt9147", "goodix,gt9xx";
+		reg = <0x5d>;				/* ★ 本板实测地址（i2c_probe 扫出来的） */
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_tsc &pinctrl_tsc_reset>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <9 0>;			/* INT = GPIO1_IO09 */
+		reset-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;	/* RST = GPIO1_IO05 */
+		irq-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+		status = "okay";
+		vddio-supply = <&reg_vddio>;
+		avdd28-supply = <&reg_avdd28>;
+	};
+};
+
+/* ==========================================================================
+ * 五、iomuxc 引脚组
+ *
+ * 说明：这些 pinctrl 组只描述「pad 复用成什么功能」。同一根 pad 出现在两个组里
+ *       并不会直接引发 -EBUSY —— pinctrl 层面不排他，最后生效的是后写入的那份配置
+ *       （这正是 pwm1grp 那次踩坑的性质：同名节点属性被覆盖，而不是报错）。
+ *       会引发 -EBUSY 的是 **gpio 资源的排他申请**，本工程里就是
+ *       reg_sd1_vmmc 的 gpio 属性占了 GPIO1_IO09（已在第一节去掉）。
+ * ========================================================================== */
+&iomuxc {
+	/* ---- ★ GPIO1_IO05 / GPIO1_IO09 的所有权修正 ----
+	 * 原板级 DTS 的 pinctrl_hog_1（project/dts/imx6ull-atk-mmc.dts:172-178）里三条：
+	 *     MX6UL_PAD_UART1_RTS_B__GPIO1_IO19    0x17059   <- SD1 CD（卡检测，必须留！）
+	 *     MX6UL_PAD_GPIO1_IO05__USDHC1_VSELECT 0x17059   <- SD1 VSELECT（要删）
+	 *     MX6UL_PAD_GPIO1_IO09__GPIO1_IO09     0x17059   <- SD1 RESET（要删）
+	 * 后两条把 IO05/IO09 配成 SD 卡用途，正好和本板触摸的 RST/INT 撞车。
+	 *
+	 * ★ 这里**不能**用 `/delete-node/ hoggrp-1` —— 板级 dts 第 171 行
+	 *   `pinctrl-0 = <&pinctrl_hog_1>;` 正引用着这个节点，删掉会让 iomuxc 的
+	 *   default pinctrl 变成悬空引用，并且会连带丢掉 SD1 CD 那条、影响卡检测。
+	 *   正确做法是**重定义 fsl,pins**、只留 SD1 CD 一条。
+	 *
+	 * ★ 也不能只写 `/delete-property/ fsl,pins;` 加一个**空的** fsl,pins 列表：
+	 *   第一版就是这么写的，结果板子 dmesg 报
+	 *   `imx6ul-pinctrl 20e0000.pinctrl: Invalid fsl,pins or pins property in
+	 *    node /soc/bus@2000000/pinctrl@20e0000/hoggrp-1`
+	 *   —— 空列表是非法属性，驱动照样会去解析并报错。
+	 *
+	 * IO09 的**所有权**冲突另有一处：板级 reg_sd1_vmmc 的 `gpio = <&gpio1 9 ...>`
+	 * 会把 IO09 占成 SD 电源使能（真板上报过
+	 * `pin MX6UL_PAD_GPIO1_IO09 already requested by 1-0014; cannot claim for 2040000.touchscreen`），
+	 * 已在第一节用 `&reg_sd1_vmmc { /delete-property/ gpio; ... }` 释放。
+	 *
+	 * 注意 &usdhc1 里有 no-1-8-v，HS 模式本来就不需要 VSELECT，删掉无损。 */
+	pinctrl_hog_1: hoggrp-1 {
+		/delete-property/ fsl,pins;
+		fsl,pins = <
+			/* 只保留 SD1 CD；IO05 给触摸 RST、IO09 给触摸 INT */
+			MX6UL_PAD_UART1_RTS_B__GPIO1_IO19	0x17059 /* SD1 CD */
+		>;
+	};
+
+	pinctrl_lcdif_dat: lcdifdatgrp {
+		fsl,pins = <
+			MX6UL_PAD_LCD_DATA00__LCDIF_DATA00	0x79
+			MX6UL_PAD_LCD_DATA01__LCDIF_DATA01	0x79
+			MX6UL_PAD_LCD_DATA02__LCDIF_DATA02	0x79
+			MX6UL_PAD_LCD_DATA03__LCDIF_DATA03	0x79
+			MX6UL_PAD_LCD_DATA04__LCDIF_DATA04	0x79
+			MX6UL_PAD_LCD_DATA05__LCDIF_DATA05	0x79
+			MX6UL_PAD_LCD_DATA06__LCDIF_DATA06	0x79
+			MX6UL_PAD_LCD_DATA07__LCDIF_DATA07	0x79
+			MX6UL_PAD_LCD_DATA08__LCDIF_DATA08	0x79
+			MX6UL_PAD_LCD_DATA09__LCDIF_DATA09	0x79
+			MX6UL_PAD_LCD_DATA10__LCDIF_DATA10	0x79
+			MX6UL_PAD_LCD_DATA11__LCDIF_DATA11	0x79
+			MX6UL_PAD_LCD_DATA12__LCDIF_DATA12	0x79
+			MX6UL_PAD_LCD_DATA13__LCDIF_DATA13	0x79
+			MX6UL_PAD_LCD_DATA14__LCDIF_DATA14	0x79
+			MX6UL_PAD_LCD_DATA15__LCDIF_DATA15	0x79
+			MX6UL_PAD_LCD_DATA16__LCDIF_DATA16	0x79
+			MX6UL_PAD_LCD_DATA17__LCDIF_DATA17	0x79
+			MX6UL_PAD_LCD_DATA18__LCDIF_DATA18	0x79
+			MX6UL_PAD_LCD_DATA19__LCDIF_DATA19	0x79
+			MX6UL_PAD_LCD_DATA20__LCDIF_DATA20	0x79
+			MX6UL_PAD_LCD_DATA21__LCDIF_DATA21	0x79
+			MX6UL_PAD_LCD_DATA22__LCDIF_DATA22	0x79
+			MX6UL_PAD_LCD_DATA23__LCDIF_DATA23	0x79
+		>;
+	};
+
+	pinctrl_lcdif_ctrl: lcdifctrlgrp {
+		fsl,pins = <
+			MX6UL_PAD_LCD_CLK__LCDIF_CLK		0x79
+			MX6UL_PAD_LCD_ENABLE__LCDIF_ENABLE	0x79
+			MX6UL_PAD_LCD_HSYNC__LCDIF_HSYNC	0x79
+			MX6UL_PAD_LCD_VSYNC__LCDIF_VSYNC	0x79
+		>;
+	};
+
+	/* ---- 背光 PWM 的引脚组「不在本文件里定义」，这是有意的 ----
+	 * 本板板级 DTS `imx6ull-atk-mmc.dts:220-224` 已经有：
+	 *     pinctrl_pwm1: pwm1grp {
+	 *         fsl,pins = <MX6UL_PAD_GPIO1_IO08__PWM1_OUT 0x110b0>;
+	 *     };
+	 * 与内核参考板 `imx6ul-14x14-evk.dtsi:539-543` 逐字节相同（0x110b0）。
+	 * 早期本文件在这里又写了一遍同名节点 `pwm1grp` —— 同名节点在 DT 里是
+	 * **属性覆盖**而不是合并，于是把 0x110b0（PDRV=R0/6）悄悄改成了
+	 * 0x17059（PDRV=R0/2，弱得多），背光可能偏暗甚至不亮。
+	 * 已删除。`&pwm1` 引用的仍是板级那一份，不要在这里重新定义。 */
+
+	pinctrl_i2c2: i2c2grp {
+		fsl,pins = <
+			MX6UL_PAD_UART5_TX_DATA__I2C2_SCL	0x4001b8b0
+			MX6UL_PAD_UART5_RX_DATA__I2C2_SDA	0x4001b8b0
+		>;
+	};
+
+	/* TSC_INT：GPIO1_IO09，上拉输入 */
+	pinctrl_tsc: tscgrp {
+		fsl,pins = <
+			MX6UL_PAD_GPIO1_IO09__GPIO1_IO09	0x79
+		>;
+	};
+
+	/* TSC_RST：GPIO1_IO05，需要一定驱动力，用 0x10B0 */
+	pinctrl_tsc_reset: tsc_reset {
+		fsl,pins = <
+			MX6UL_PAD_GPIO1_IO05__GPIO1_IO05	0x10B0
+		>;
+	};
+};

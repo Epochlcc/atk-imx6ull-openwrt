@@ -1,0 +1,36 @@
+# ============================================================
+# 换行符策略：仓库内部一律 LF
+#
+# 本工程对 CRLF 零容忍，这不是代码风格偏好，而是功能约束：
+#   · 带 CRLF 的 *.patch → git apply 报 "corrupt patch"，补丁应用失败
+#   · 带 CRLF 的 *.dts   → dtc 可能报语法错，或编出的 dtb 与参考哈希不符
+#   · 带 CRLF 的 *.sh    → Linux 下报 "bad interpreter: /bin/bash^M"
+#
+# 本文件优先级高于任何本地设置，即便你在 Windows 上以
+# core.autocrlf=true 编辑，提交进仓库的仍是 LF。
+# ============================================================
+* text=auto eol=lf
+
+# 关键类型显式声明，覆盖任何全局设置
+*.sh        text eol=lf
+*.py        text eol=lf
+*.patch     text eol=lf
+*.dts       text eol=lf
+*.dtsi      text eol=lf
+*.mk        text eol=lf
+Makefile    text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.config    text eol=lf
+series      text eol=lf
+
+# 二进制文件：不做换行符转换
+# （当前工程无此类受控文件，为将来扩展预留）
+*.bin       binary
+*.ipk       binary
+*.xz        binary
+*.tar       binary
+*.gz        binary
+*.bz2       binary
+*.png       binary
+*.jpg       binary

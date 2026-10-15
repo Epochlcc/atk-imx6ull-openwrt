@@ -1,0 +1,11 @@
+# 由本工程接管、需要从上游树中删除的文件。
+# 格式：每行一个相对上游根目录的路径，# 开头为注释。
+
+# DTS 已改为出树维护（见 project/dts/），内核不再需要编译 imx6ull-atk-mmc.dtb，
+# 因此该补丁整体不再需要：
+#   - 内核 dts/Makefile 的注册行：出树后不再走内核编译
+#   - imx6ull-atk-mmc.dts：内容已抽取到 project/dts/
+#   - arch/arm/configs/imx_atk_mmc_defconfig、build.sh：作者用于「内核独立编译」
+#     的辅助文件，OpenWrt 的构建流程不会引用它们（OpenWrt 用自己的
+#     target/linux/imx/config-5.15 + cortexa7/config-default 生成内核配置）
+target/linux/imx/patches-5.15/401-fix-support-atk-board.patch

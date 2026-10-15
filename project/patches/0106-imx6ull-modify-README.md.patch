@@ -1,0 +1,25 @@
+From f75c08dd2e8498051382779d3c2b458a33738dd9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=8B=AE=E5=AD=90=E6=98=AFLION?= <beiyongmail@foxmail.com>
+Date: Sun, 31 Mar 2024 23:09:58 +0800
+Subject: [PATCH 106/114] imx6ull: modify README.md
+
+---
+ README.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/README.md b/README.md
+index f3f3c250b1..42f61d07f0 100755
+--- a/README.md
++++ b/README.md
+@@ -59,9 +59,9 @@ make V=s > make.log 2>&1
+ 
+ 通过`balenaEtcher`软件，将固件烧录到SD卡中。
+ 
+-烧录软件下载地址：https://etcher.balena.io/#download-etcher。
++烧录软件下载地址：https://etcher.balena.io/#download-etcher
+ 
+-IMX6ULL固件地址：https://github.com/boxwoodt/imx6ull_openwrt/releases/download/v1.0/openwrt-23.05-snapshot-r0+23781-0844937947-imx-cortexa7-imx6ull-atk-emmc-squashfs-combined.bin。
++IMX6ULL固件地址：https://github.com/boxwoodt/imx6ull_openwrt/releases/download/v1.0/openwrt-23.05-snapshot-r0+23781-0844937947-imx-cortexa7-imx6ull-atk-emmc-squashfs-combined.bin
+ 
+ ![](https://github.com/boxwoodt/imx6ull_openwrt/blob/imx6ull_openwrt/doc/img/firmware_burn.png?raw=true)
+ 

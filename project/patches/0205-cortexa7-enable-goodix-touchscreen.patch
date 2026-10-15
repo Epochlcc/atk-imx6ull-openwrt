@@ -1,0 +1,14 @@
+diff --git a/target/linux/imx/cortexa7/config-default b/target/linux/imx/cortexa7/config-default
+index 10f23be435..8977daba08 100644
+--- a/target/linux/imx/cortexa7/config-default
++++ b/target/linux/imx/cortexa7/config-default
+@@ -85,3 +85,9 @@ CONFIG_VIDEOMODE_HELPERS=y
+ CONFIG_VT=y
+ CONFIG_VT_CONSOLE=y
+ CONFIG_VT_HW_CONSOLE_BINDING=y
++
++# --- industrial_control 二次开发：GT9xx 电容触摸（B 阶段） ---
++# 触摸驱动必须自己写进 kernel config：OpenWrt 的 package/kernel/linux
++# modules/input.mk 里没有 goodix 对应的 kmod 包，只能走内核配置。
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_GOODIX=y

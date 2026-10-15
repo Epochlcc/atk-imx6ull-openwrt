@@ -1,0 +1,42 @@
+From 69cdadc3afecd054bb372a636fa98fbd8522f1ba Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=8B=AE=E5=AD=90=E6=98=AFLION?= <beiyongmail@foxmail.com>
+Date: Thu, 8 Aug 2024 00:27:47 +0800
+Subject: [PATCH 112/114] =?UTF-8?q?fix:=20=E5=A2=9E=E5=8A=A0faq=E6=96=87?=
+ =?UTF-8?q?=E6=A1=A3?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ README.md  |  2 ++
+ doc/faq.md | 11 +++++++++++
+ 2 files changed, 13 insertions(+)
+ create mode 100644 doc/faq.md
+
+diff --git a/README.md b/README.md
+index ba4a2f2ce0..1726b47a5b 100755
+--- a/README.md
++++ b/README.md
+@@ -6,3 +6,5 @@
+ 
+ 3. [基于 SD卡 烧录 eMMC 固件](doc/burn_emmc_image.md)
+ 
++1. [常见问题](doc/faq.md)
++
+diff --git a/doc/faq.md b/doc/faq.md
+new file mode 100644
+index 0000000000..2ecf4a3c74
+--- /dev/null
++++ b/doc/faq.md
+@@ -0,0 +1,11 @@
++# 常见问题解答 (FAQ)
++
++## 1、上电以后默认随机MAC地址，每次都要重新查找IP。
++
++ `u-boot-2022` 中默认 mac 地址是随机生成，可以在 `u-boot` 中通过以下指令进行配置，保存在环境变量中。
++
++```shell
++setenv ethaddr 32:43:a0:63:17:7b
++setenv eth1addr ae:62:ba:c5:6c:1c
++saveenv
++```

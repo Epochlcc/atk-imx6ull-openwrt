@@ -1,0 +1,29 @@
+From: atk-imx6ull-openwrt <noreply@local>
+Subject: [PATCH] imx: 支持出树 DTS（设备定义 + 镜像组装）
+
+imx: 支持出树 DTS（设备定义 + 镜像组装）
+---
+diff --git a/target/linux/imx/image/cortexa7.mk b/target/linux/imx/image/cortexa7.mk
+--- a/target/linux/imx/image/cortexa7.mk
++++ b/target/linux/imx/image/cortexa7.mk
+@@ -34,6 +34,7 @@
+   DEVICE_MODEL := atk-mmc
+   UBOOT := mx6ull_atk_mmc
+   DEVICE_DTS := imx6ull-atk-mmc
++  DEVICE_DTS_DIR := $(TOPDIR)/../project/dts
+   DEVICE_PACKAGES := kmod-usb2 kmod-usb3 kmod-usb-ohci kmod-usb-uhci \
+ 		kmod-usb-wdm kmod-usb-core kmod-usb-hid kmod-usb-net \
+ 		kmod-usb-net-cdc-ether kmod-usb-net-cdc-mbim kmod-usb-net-cdc-subset
+diff --git a/target/linux/imx/image/common.mk b/target/linux/imx/image/common.mk
+--- a/target/linux/imx/image/common.mk
++++ b/target/linux/imx/image/common.mk
+@@ -12,7 +12,7 @@
+ 
+ 	$(foreach dts,$(DEVICE_DTS), \
+ 		$(CP) \
+-			$(DTS_DIR)/$(dts).dtb \
++			$(if $(DEVICE_DTS_DIR),$(KDIR)/image-$(notdir $(dts)).dtb,$(DTS_DIR)/$(dts).dtb) \
+-			$@.boot/;
++			$@.boot/$(notdir $(dts)).dtb;
+ 	)
+ 

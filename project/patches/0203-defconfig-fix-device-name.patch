@@ -1,0 +1,17 @@
+From: atk-imx6ull-openwrt <noreply@local>
+Subject: [PATCH] defconfig: 修正已失效的设备名 imx6ull-atk-emmc -> imx6ull-atk-mmc
+
+defconfig: 修正已失效的设备名 imx6ull-atk-emmc -> imx6ull-atk-mmc
+---
+diff --git a/atk_imx6ull_defconfig b/atk_imx6ull_defconfig
+--- a/atk_imx6ull_defconfig
++++ b/atk_imx6ull_defconfig
+@@ -51,7 +51,7 @@
+ # CONFIG_TARGET_imx_cortexa9 is not set
+ # CONFIG_TARGET_MULTI_PROFILE is not set
+ # CONFIG_TARGET_imx_cortexa7_Default is not set
+-CONFIG_TARGET_imx_cortexa7_DEVICE_imx6ull-atk-emmc=y
++CONFIG_TARGET_imx_cortexa7_DEVICE_imx6ull-atk-mmc=y
+ # CONFIG_TARGET_imx_cortexa7_DEVICE_technexion_imx7d-pico-pi is not set
+ CONFIG_HAS_SUBTARGETS=y
+ CONFIG_HAS_DEVICES=y

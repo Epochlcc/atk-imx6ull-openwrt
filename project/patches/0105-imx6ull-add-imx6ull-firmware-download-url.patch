@@ -1,0 +1,29 @@
+From a13fbccf491c46d62a4c562f376d7bd01cfdacb0 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=8B=AE=E5=AD=90=E6=98=AFLION?= <beiyongmail@foxmail.com>
+Date: Sun, 31 Mar 2024 23:06:17 +0800
+Subject: [PATCH 105/114] imx6ull: add imx6ull firmware download url
+
+---
+ README.md | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+ mode change 100644 => 100755 README.md
+
+diff --git a/README.md b/README.md
+old mode 100644
+new mode 100755
+index 925d2061a8..f3f3c250b1
+--- a/README.md
++++ b/README.md
+@@ -57,7 +57,11 @@ make V=s > make.log 2>&1
+ 
+ ## 4、固件烧录
+ 
+-通过`balenaEtcher`软件，将固件烧录到SD卡中。下载地址为https://etcher.balena.io/#download-etcher。
++通过`balenaEtcher`软件，将固件烧录到SD卡中。
++
++烧录软件下载地址：https://etcher.balena.io/#download-etcher。
++
++IMX6ULL固件地址：https://github.com/boxwoodt/imx6ull_openwrt/releases/download/v1.0/openwrt-23.05-snapshot-r0+23781-0844937947-imx-cortexa7-imx6ull-atk-emmc-squashfs-combined.bin。
+ 
+ ![](https://github.com/boxwoodt/imx6ull_openwrt/blob/imx6ull_openwrt/doc/img/firmware_burn.png?raw=true)
+ 

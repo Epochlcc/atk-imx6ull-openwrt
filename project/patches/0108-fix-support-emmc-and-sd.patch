@@ -1,0 +1,181 @@
+From 336ace819cb5b953c9716037ee8f3653970681fc Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=8B=AE=E5=AD=90=E6=98=AFLION?= <beiyongmail@foxmail.com>
+Date: Sun, 4 Aug 2024 23:18:30 +0800
+Subject: [PATCH 108/114] fix: support emmc and sd
+
+---
+ .gitignore                                    |  2 ++
+ .../patches/0003-fix-support-emmc.patch       | 16 +++++++++++++
+ ...ll-atk-emmc => bootscript-imx6ull-atk-mmc} | 12 +++++++---
+ target/linux/imx/image/cortexa7.mk            |  8 +++----
+ .../401-fix-support-atk-board.patch           | 24 +++++++++----------
+ 5 files changed, 43 insertions(+), 19 deletions(-)
+ create mode 100644 package/boot/uboot-imx/patches/0003-fix-support-emmc.patch
+ rename target/linux/imx/image/{bootscript-imx6ull-atk-emmc => bootscript-imx6ull-atk-mmc} (85%)
+
+diff --git a/.gitignore b/.gitignore
+index a80cdbbea3..5014c9a1b5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -32,3 +32,5 @@ git-src
+ .cproject
+ .ccache
+ .vscode*
++
++*.log
+diff --git a/package/boot/uboot-imx/patches/0003-fix-support-emmc.patch b/package/boot/uboot-imx/patches/0003-fix-support-emmc.patch
+new file mode 100644
+index 0000000000..778ab6d732
+--- /dev/null
++++ b/package/boot/uboot-imx/patches/0003-fix-support-emmc.patch
+@@ -0,0 +1,16 @@
++diff --git a/include/configs/mx6ull_atk_mmc.h b/include/configs/mx6ull_atk_mmc.h
++index 496484e2a6..5eead06ada 100644
++--- a/include/configs/mx6ull_atk_mmc.h
+++++ b/include/configs/mx6ull_atk_mmc.h
++@@ -105,6 +105,11 @@
++ 		"fi;\0" \
++ 
++ #define CONFIG_BOOTCOMMAND \
+++		"if mmc dev 0; then "\
+++			"setenv mmcdev 0; "\
+++		"elif mmc dev 1; then "\
+++			"setenv mmcdev 1; "\
+++		"fi; "\
++ 	   "mmc dev ${mmcdev};" \
++ 	   "mmc dev ${mmcdev}; if mmc rescan; then " \
++ 		   "if run loadbootscript; then " \
+diff --git a/target/linux/imx/image/bootscript-imx6ull-atk-emmc b/target/linux/imx/image/bootscript-imx6ull-atk-mmc
+similarity index 85%
+rename from target/linux/imx/image/bootscript-imx6ull-atk-emmc
+rename to target/linux/imx/image/bootscript-imx6ull-atk-mmc
+index e6e33dccfc..c4623eb166 100644
+--- a/target/linux/imx/image/bootscript-imx6ull-atk-emmc
++++ b/target/linux/imx/image/bootscript-imx6ull-atk-mmc
+@@ -5,15 +5,21 @@ echo "ATK-imx6ull OpenWrt boot script"
+ 
+ # Set console variable for both UART and HDMI
+ setenv console "console=ttymxc0,115200 console=tty0"
+-setenv fdt_name imx6ull-atk-emmc.dtb
+-setenv mmcdev 0
++setenv fdt_name imx6ull-atk-mmc.dtb
+ setenv mmcrootpart 2
+ setenv kernel_addr_r 0x80800000
+ setenv fdt_addr_r 0x83000000
+-part uuid mmc ${mmcdev}:${mmcrootpart} uuid
+ 
+ # Set correct devtype and partition
+ if test ${devtype} != mmc; then setenv devtype mmc; fi
++# Priority boot from SD card
++if mmc dev 0; then
++	setenv mmcdev 0
++elif mmc dev 1; then
++	setenv mmcdev 1
++fi
++
++part uuid mmc ${mmcdev}:${mmcrootpart} uuid
+ 
+ # Boot from eMMC is the only supported option
+ setenv bootargs "${console} root=PARTUUID=${uuid} rw rootwait"
+diff --git a/target/linux/imx/image/cortexa7.mk b/target/linux/imx/image/cortexa7.mk
+index c202e14514..4db04a6cd3 100644
+--- a/target/linux/imx/image/cortexa7.mk
++++ b/target/linux/imx/image/cortexa7.mk
+@@ -29,11 +29,11 @@ define Device/technexion_imx7d-pico-pi
+ endef
+ TARGET_DEVICES += technexion_imx7d-pico-pi
+ 
+-define Device/imx6ull-atk-emmc
++define Device/imx6ull-atk-mmc
+   DEVICE_VENDOR := Alientek
+-  DEVICE_MODEL := atk-emmc
++  DEVICE_MODEL := atk-mmc
+   UBOOT := mx6ull_atk_mmc
+-  DEVICE_DTS := imx6ull-atk-emmc
++  DEVICE_DTS := imx6ull-atk-mmc
+   DEVICE_PACKAGES := kmod-usb2 kmod-usb3 kmod-usb-ohci kmod-usb-uhci \
+ 		kmod-usb-wdm kmod-usb-core kmod-usb-hid kmod-usb-net \
+ 		kmod-usb-net-cdc-ether kmod-usb-net-cdc-mbim kmod-usb-net-cdc-subset
+@@ -42,4 +42,4 @@ define Device/imx6ull-atk-emmc
+   IMAGE/combined.bin := append-rootfs | pad-extra 128k | imx6ull-sdcard-raw-uboot
+   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+ endef
+-TARGET_DEVICES += imx6ull-atk-emmc
++TARGET_DEVICES += imx6ull-atk-mmc
+diff --git a/target/linux/imx/patches-5.15/401-fix-support-atk-board.patch b/target/linux/imx/patches-5.15/401-fix-support-atk-board.patch
+index eb24855337..fe343afe1f 100644
+--- a/target/linux/imx/patches-5.15/401-fix-support-atk-board.patch
++++ b/target/linux/imx/patches-5.15/401-fix-support-atk-board.patch
+@@ -5,12 +5,12 @@ Subject: [PATCH] fix: support atk board
+ 
+ ---
+  arch/arm/boot/dts/Makefile              |   1 +
+- arch/arm/boot/dts/imx6ull-atk-emmc.dts  | 466 +++++++++++++++++++
+- arch/arm/configs/imx_atk_emmc_defconfig | 594 ++++++++++++++++++++++++
++ arch/arm/boot/dts/imx6ull-atk-mmc.dts   | 466 +++++++++++++++++++
++ arch/arm/configs/imx_atk_mmc_defconfig  | 594 ++++++++++++++++++++++++
+  build.sh                                |  20 +
+  4 files changed, 1081 insertions(+)
+- create mode 100644 arch/arm/boot/dts/imx6ull-atk-emmc.dts
+- create mode 100644 arch/arm/configs/imx_atk_emmc_defconfig
++ create mode 100644 arch/arm/boot/dts/imx6ull-atk-mmc.dts
++ create mode 100644 arch/arm/configs/imx_atk_mmc_defconfig
+  create mode 100755 build.sh
+ 
+ diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+@@ -21,15 +21,15 @@ index 12ce9965f55b..dea3f002e618 100644
+ 	imx6ul-14x14-evk.dtb \
+ 	imx6ul-ccimx6ulsbcexpress.dtb \
+ 	imx6ul-ccimx6ulsbcpro.dtb \
+-+	imx6ull-atk-emmc.dtb \
+++	imx6ull-atk-mmc.dtb \
+ 	imx6ul-geam.dtb \
+ 	imx6ul-isiot-emmc.dtb \
+ 	imx6ul-isiot-nand.dtb \
+-diff --git a/arch/arm/boot/dts/imx6ull-atk-emmc.dts b/arch/arm/boot/dts/imx6ull-atk-emmc.dts
++diff --git a/arch/arm/boot/dts/imx6ull-atk-mmc.dts b/arch/arm/boot/dts/imx6ull-atk-mmc.dts
+ new file mode 100644
+ index 000000000000..607834bc1260
+ --- /dev/null
+-+++ b/arch/arm/boot/dts/imx6ull-atk-emmc.dts
+++++ b/arch/arm/boot/dts/imx6ull-atk-mmc.dts
+ @@ -0,0 +1,466 @@
+ +/*
+ + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+@@ -46,7 +46,7 @@ index 000000000000..607834bc1260
+ +
+ +/ {
+ +	model = "Freescale ATK IMX6ULL Board";
+-+	compatible = "imx6ull-atk-emmc", "fsl,imx6ull";
+++	compatible = "imx6ull-atk-mmc", "fsl,imx6ull";
+ +
+ +	chosen {
+ +		stdout-path = &uart1;
+@@ -497,11 +497,11 @@ index 000000000000..607834bc1260
+ +	pinctrl-0 = <&pinctrl_wdog>;
+ +	fsl,ext-reset-output;
+ +};
+-diff --git a/arch/arm/configs/imx_atk_emmc_defconfig b/arch/arm/configs/imx_atk_emmc_defconfig
++diff --git a/arch/arm/configs/imx_atk_mmc_defconfig b/arch/arm/configs/imx_atk_mmc_defconfig
+ new file mode 100644
+ index 000000000000..3f12be60be99
+ --- /dev/null
+-+++ b/arch/arm/configs/imx_atk_emmc_defconfig
+++++ b/arch/arm/configs/imx_atk_mmc_defconfig
+ @@ -0,0 +1,594 @@
+ +CONFIG_SYSVIPC=y
+ +CONFIG_POSIX_MQUEUE=y
+@@ -1109,11 +1109,11 @@ index 000000000000..dea088db82ce
+ +
+ +make ARCH=arm CROSS_COMPILE=arm-openwrt-linux- distclean
+ +# make ARCH=arm CROSS_COMPILE=arm-openwrt-linux- imx_v7_defconfig
+-+make ARCH=arm CROSS_COMPILE=arm-openwrt-linux- imx_atk_emmc_defconfig
+++make ARCH=arm CROSS_COMPILE=arm-openwrt-linux- imx_atk_mmc_defconfig
+ +# make ARCH=arm CROSS_COMPILE=arm-openwrt-linux- menuconfig
+ +make ARCH=arm CROSS_COMPILE=arm-openwrt-linux-
+ +
+-+cp ./arch/arm/boot/dts/imx6ull-atk-emmc.dtb ./atk/imx6ull-atk-emmc.dtb
+++cp ./arch/arm/boot/dts/imx6ull-atk-mmc.dtb ./atk/imx6ull-atk-mmc.dtb
+ +cp ./arch/arm/boot/zImage ./atk/zImage
+ +
+ +

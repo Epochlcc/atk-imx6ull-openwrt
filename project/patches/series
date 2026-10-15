@@ -1,0 +1,59 @@
+# atk-imx6ull-openwrt 补丁应用顺序
+#
+# 由 scripts/setup.sh 按此顺序、用 git apply 依次应用到 upstream/。
+# 顺序不可调整：0100-0114 是平台支持的历史累积，0201-0203 建立在其结果之上。
+#
+# ---------------------------------------------------------------
+# 0100-0114  平台支持定制（15 个提交）
+#   导出自 openwrt/openwrt 的 imx6ull 分支，生成命令：
+#       git format-patch --binary --start-number 100 \
+#           0844937947..ec3b0d4684 -o project/patches
+#   基线 = openwrt/openwrt @ 0844937947（见 scripts/bootstrap.sh 的 BASE_COMMIT）
+#
+#   ★ 其中 0103、0109、0113、0114 含二进制补丁段（文档配图），
+#     必须用 git apply 应用，不能用 patch(1) —— 后者无法重建二进制内容。
+#
+# ---------------------------------------------------------------
+# 0201-0203  本工程改进
+#   0201  设备树出树：启用 DEVICE_DTS_DIR 并改写镜像组装，DTS 从此不再藏在补丁里
+#   0202  rtl8188eu 源码地址由 SSH(git@) 改为 HTTPS，避免公钥校验失败
+#   0203  defconfig 设备名 imx6ull-atk-emmc → imx6ull-atk-mmc（修正上游改名遗漏）
+# 0204-0205  本工程改进（续）
+#   0204  feeds 走 GitHub 镜像（绕开 git.openwrt.org 不通）
+#   0205  cortexa7/config-default 打开 GT9xx 电容触摸：
+#         OpenWrt 的 kmod 包列表（package/kernel/linux/modules/input.mk）
+#         里没有 goodix 对应的包，只能写进内核配置。
+#         ★ 屏与触摸的设备树不走补丁 —— 走 project/dts/lcd_touch.dtsi 出树机制。
+#   0206  cortexa7 让 goodix 不走固件配置路径：goodix 是内置驱动，probe 发生在
+#         rootfs 挂载之前，/lib/firmware 里的固件读不到；随后 request_firmware 退到
+#         sysfs 用户态回退，而本系统没有 udev，于是要等满 60 秒固件超时才会回调，
+#         /dev/input/eventX 也就迟到约 60 秒。改为 probe 内直接
+#         goodix_configure_dev()，由 goodix_read_config() 沿用芯片 NVM 出厂配置。
+#         ★ 别用「往 rootfs 装一个空的 /lib/firmware/goodix_911_cfg.bin」这招：
+#           空文件会让 goodix_send_cfg() → goodix_check_cfg() 的
+#           `len < GOODIX_CONFIG_MIN_LENGTH(186)` 返回 -EINVAL，回调里
+#           goto err_release_cfg，goodix_configure_dev() 永不执行 ⇒ 触摸全废。
+#         本补丁新增 target/linux/imx/patches-5.15/403-goodix-use-chip-config-not-firmware.patch
+# ---------------------------------------------------------------
+
+0100-imx6ul-support-atk-imx6ull-board-EC20-and-rtl8188eu-.patch
+0101-imx6ull-add-atk_imx6ull_defconfig-and-readme.md.patch
+0102-imx6ull-readme.md.patch
+0103-imx6ull-add-doc.patch
+0104-imx6ull-modify-the-image-link-in-the-readme.md-file.patch
+0105-imx6ull-add-imx6ull-firmware-download-url.patch
+0106-imx6ull-modify-README.md.patch
+0107-Update-README.md.patch
+0108-fix-support-emmc-and-sd.patch
+0109-fix-SD.patch
+0110-fix-SD.patch
+0111-fix-emmc.patch
+0112-fix-faq.patch
+0113-fix-4G.patch
+0114-doc-EC20.patch
+0201-target-imx-use-out-of-tree-dts.patch
+0202-rtl8188eu-use-https-source.patch
+0203-defconfig-fix-device-name.patch
+0204-feeds-use-github-mirrors.patch
+0205-cortexa7-enable-goodix-touchscreen.patch
+0206-cortexa7-goodix-use-chip-config-not-firmware.patch

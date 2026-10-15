@@ -1,0 +1,51 @@
+diff --git a/target/linux/imx/patches-5.15/403-goodix-use-chip-config-not-firmware.patch b/target/linux/imx/patches-5.15/403-goodix-use-chip-config-not-firmware.patch
+new file mode 100644
+index 0000000000..7c6576b062
+--- /dev/null
++++ b/target/linux/imx/patches-5.15/403-goodix-use-chip-config-not-firmware.patch
+@@ -0,0 +1,45 @@
++industrial_control 二次开发（B 阶段）：让 goodix 不走固件配置路径
++
++goodix 是内置驱动，probe 发生在 rootfs 挂载之前，/lib/firmware 里的固件读不到；
++随后 request_firmware 退到 sysfs 用户态回退，本系统没有 udev，于是必须等满 60 秒
++固件超时才会回调，/dev/input/eventX 也就迟到约 60 秒。改为 probe 内直接
++goodix_configure_dev()，沿用芯片 NVM 出厂配置。详见 hunk 里的注释。
++
++---
++--- a/drivers/input/touchscreen/goodix.c
+++++ b/drivers/input/touchscreen/goodix.c
++@@ -918,7 +918,33 @@
++ 	default:
++ 		if (ts->gpiod_int && ts->gpiod_rst) {
++ 			ts->reset_controller_at_probe = true;
++-			ts->load_cfg_from_disk = true;
+++			/*
+++			 * industrial_control 二次开发（ATK i.MX6ULL + GT9147）：
+++			 * 这里原本是 ts->load_cfg_from_disk = true，会让 probe 在
+++			 * request_firmware_nowait() 之后直接 return，真正注册 input 设备的
+++			 * goodix_configure_dev() 只能等固件回调 goodix_config_cb()。
+++			 *
+++			 * 本板读不到这个固件：goodix 是内置驱动（CONFIG_TOUCHSCREEN_GOODIX=y），
+++			 * probe 发生在 rootfs 挂载之前（实测 probe 在 2.7 s，而 mmcblk0 到
+++			 * 3.2 s 才出现、rootfs 到 10.8 s 才挂上），/lib/firmware 里的文件
+++			 * 根本不存在；随后 request_firmware 退到 sysfs 用户态回退，本系统
+++			 * 没有 udev，没人喂，于是要等满 60 秒固件超时才会回调。
+++			 * 结果：触摸功能正常，但 /dev/input/eventX 迟到约 60 秒才出现。
+++			 *
+++			 * ★ 不要改用「往 rootfs 放一个空的 goodix_911_cfg.bin 让请求立刻成功」：
+++			 *   空文件会让 goodix_config_cb() 走到
+++			 *   goodix_send_cfg(ts, cfg->data, 0) → goodix_check_cfg() 里
+++			 *   `len < GOODIX_CONFIG_MIN_LENGTH(186)` 返回 -EINVAL → goto
+++			 *   err_release_cfg，goodix_configure_dev() 反而永远不会执行，
+++			 *   触摸彻底不可用（比 60 秒延迟更糟）。
+++			 *
+++			 * 所以直接不走固件配置路径：probe 会调用 goodix_configure_dev()，
+++			 * 由它内部的 goodix_read_config() 读回芯片 NVM 里的出厂配置并据此
+++			 * 设置 ABS_MT_POSITION_X/Y 的取值范围（本板实测 0..1025 / 0..599）。
+++			 * reset_controller_at_probe 与 IRQ_PIN_ACCESS_GPIO 保持原样 —— 复位
+++			 * 序列（含用 INT 电平选 I2C 地址）依旧照做。
+++			 */
+++			ts->load_cfg_from_disk = false;
++ 			ts->irq_pin_access_method = IRQ_PIN_ACCESS_GPIO;
++ 		}
++ 	}

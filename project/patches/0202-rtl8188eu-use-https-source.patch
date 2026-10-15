@@ -1,0 +1,17 @@
+From: atk-imx6ull-openwrt <noreply@local>
+Subject: [PATCH] rtl8188eu: 源地址改用 HTTPS，避免 SSH 公钥校验失败
+
+rtl8188eu: 源地址改用 HTTPS，避免 SSH 公钥校验失败
+---
+diff --git a/package/kernel/rtl8188eu/Makefile b/package/kernel/rtl8188eu/Makefile
+--- a/package/kernel/rtl8188eu/Makefile
++++ b/package/kernel/rtl8188eu/Makefile
+@@ -10,7 +10,7 @@
+ PKG_NAME:=rtl8188eu
+ PKG_RELEASE=1
+ 
+-PKG_SOURCE_URL:=git@github.com:ivanovborislav/rtl8188eu.git
++PKG_SOURCE_URL:=https://github.com/ivanovborislav/rtl8188eu.git
+ PKG_SOURCE_PROTO:=git
+ PKG_SOURCE_DATE:=2023-3-15
+ PKG_SOURCE_VERSION:=163badb4564be50ce11aa3e6fdd2e18f3e4c4b90

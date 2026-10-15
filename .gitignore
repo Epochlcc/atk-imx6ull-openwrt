@@ -1,0 +1,29 @@
+# ---- 上游源码树 ----
+# upstream/ 是一个 Git Submodule（见 .gitmodules），由 scripts/bootstrap.sh
+# 注册并检出到固定基线。它本身约 1 GB，绝不进入本仓库。
+#
+# 注意：这条规则是有意保留的 —— 它防止任何一种误操作把整个上游树提交进来。
+# 代价是 git 默认不允许登记被忽略路径，所以 bootstrap.sh 里用的是
+# `git submodule add --force` 和 `git add --force`。
+/upstream/
+
+# ---- 迁移过渡期 ----
+# 从「普通 clone 的上游目录」切换到 submodule 时，bootstrap.sh 会提示把旧目录
+# 改名为 upstream.old。确认新树工作正常后请手工删除，见 README。
+/upstream.old/
+
+# ---- 下载的源码包（约 700 MB）----
+# 位置由 .config 的 CONFIG_DOWNLOAD_FOLDER 决定，默认 <工程根>/dl。
+# 它位于 upstream/ 之外，所以 make distclean / git clean -xdf 都不会波及它
+# （这正是 OpenWrt 官方对 config/Config-devel.in 中该选项的说明）。
+/dl/
+
+# ---- 构建产物：位置由 CONFIG_BINARY_FOLDER 决定，默认 <工程根>/out ----
+/out/
+
+# ---- 杂项 ----
+*.swp
+*.log
+__pycache__/
+*.pyc
+.DS_Store

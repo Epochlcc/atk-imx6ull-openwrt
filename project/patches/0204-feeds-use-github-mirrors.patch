@@ -1,0 +1,30 @@
+From: atk-imx6ull-openwrt <noreply@local>
+Subject: [PATCH] feeds: 源地址改用 GitHub 官方镜像，避免 git.openwrt.org 传输卡死
+
+feeds: 源地址改用 GitHub 官方镜像，避免 git.openwrt.org 传输卡死
+
+git.openwrt.org 端点是可用的（info/refs 能返回完整分支表），但实际抓取
+数据几乎不动，feeds update 会长时间停在 "Cloning into ..." 上。
+
+改用 OpenWrt 官方在 GitHub 上的同名镜像仓库，分支都是 openwrt-23.05，
+内容与 git.openwrt.org 一致：
+    https://github.com/openwrt/packages
+    https://github.com/openwrt/luci
+    https://github.com/openwrt/routing
+    https://github.com/openwrt/telephony
+
+若需要改回原地址，编辑 upstream/feeds.conf.default 后跑 scripts/feeds.sh；
+或在 project/feeds.conf 放一份自定义清单（feeds.sh 会优先使用它）。
+---
+diff --git a/feeds.conf.default b/feeds.conf.default
+--- a/feeds.conf.default
++++ b/feeds.conf.default
+@@ -1,4 +1,4 @@
+-src-git packages https://git.openwrt.org/feed/packages.git;openwrt-23.05
+-src-git luci https://git.openwrt.org/project/luci.git;openwrt-23.05
+-src-git routing https://git.openwrt.org/feed/routing.git;openwrt-23.05
+-src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-23.05
++src-git packages https://github.com/openwrt/packages.git;openwrt-23.05
++src-git luci https://github.com/openwrt/luci.git;openwrt-23.05
++src-git routing https://github.com/openwrt/routing.git;openwrt-23.05
++src-git telephony https://github.com/openwrt/telephony.git;openwrt-23.05
